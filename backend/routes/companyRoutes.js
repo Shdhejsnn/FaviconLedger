@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { contract, web3 } = require("../contract");
 
-const ownerAddress = "0x9A770E0F8b03b47ef15Fc8e279aB717b58A6dB92"; // 💡 Ganache deployer
+const ownerAddress = "0x550983d8f8D8262eb735080D1dfFaA9C2Ea15441"; // 💡 Ganache deployer
 
 // ✅ Register company
 router.post("/register", async (req, res) => {
@@ -111,18 +111,18 @@ router.post("/buy", async (req, res) => {
 });
 
 router.post("/sell", async (req, res) => {
-  const { from, privateKey, tokenId, salePriceInEth } = req.body;
+  const { from, privateKey, tokenId, region, credits, expectedEth } = req.body;
 
-  if (!from || !privateKey || !tokenId || !salePriceInEth) {
+  if (!from || !privateKey || !tokenId || !region || !credits || !expectedEth) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
     const ownerAddress = process.env.OWNER_ADDRESS;
     const ownerPrivateKey = process.env.OWNER_PRIVATE_KEY;
-    const priceInWei = web3.utils.toWei(salePriceInEth.toString(), "ether");
+    const priceInWei = web3.utils.toWei(expectedEth.toString(), "ether");
 
-    // ✅ 1. Transfer token from user to contract owner
+    // 1. Transfer token from user to owner
     const transferTx = contract.methods.transferFrom(from, ownerAddress, tokenId).encodeABI();
     const nonce1 = await web3.eth.getTransactionCount(from);
     const gasPrice = await web3.eth.getGasPrice();
@@ -138,9 +138,8 @@ router.post("/sell", async (req, res) => {
 
     const transferReceipt = await web3.eth.sendSignedTransaction(signedTransfer.rawTransaction);
 
-    // ✅ 2. Transfer ETH from contract owner to seller
+    // 2. Owner sends ETH to seller
     const nonce2 = await web3.eth.getTransactionCount(ownerAddress);
-
     const signedPayment = await web3.eth.accounts.signTransaction({
       from: ownerAddress,
       to: from,
@@ -153,16 +152,22 @@ router.post("/sell", async (req, res) => {
     const paymentReceipt = await web3.eth.sendSignedTransaction(signedPayment.rawTransaction);
 
     res.json({
-      message: `✅ Sold token ${tokenId} for ${salePriceInEth} ETH`,
-      tokenId,
-      txHashTransfer: transferReceipt.transactionHash,
-      txHashPayment: paymentReceipt.transactionHash,
+      message: `✅ Sold token ${tokenId} for ${expectedEth} ETH`,
+      ledger: {
+        txHash: paymentReceipt.transactionHash,
+        tokenId,
+        region,
+        credits,
+        seller: from,
+        ethAmount: expectedEth,
+      }
     });
   } catch (err) {
     console.error("❌ Sell Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 
 module.exports = router;

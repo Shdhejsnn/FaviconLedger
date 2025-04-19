@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { CarbonPriceProvider } from './context/CarbonPriceContext';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import LandingPage from './components/landing/LandingPage';
@@ -60,7 +61,9 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppContent />
+        <CarbonPriceProvider>
+          <AppContent />
+        </CarbonPriceProvider>
       </AuthProvider>
     </ThemeProvider>
   );

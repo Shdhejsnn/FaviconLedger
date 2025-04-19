@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { Loader, Newspaper, RefreshCw, ArrowUpRight, AlertCircle, TrendingUp } from 'lucide-react';
+import { Loader, Newspaper, RefreshCw, ArrowUpRight, TrendingUp } from 'lucide-react';
 import axios from 'axios';
 
 interface NewsArticle {
@@ -11,7 +11,7 @@ interface NewsArticle {
   pubDate: string;
   source_id: string;
   image_url?: string;
-  source: 'newsdata' | 'gnews' | 'carbonpulse';
+  source: 'newsdata' | 'gnews';
   category?: string;
   isNew?: boolean;
 }
@@ -112,88 +112,21 @@ const fetchGNewsArticles = async (): Promise<NewsResponse> => {
   }
 };
 
-// Carbon Pulse mock data
-const fetchCarbonPulseArticles = async (): Promise<NewsResponse> => {
-  try {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const currentDate = new Date().toISOString();
-        
-        const mockArticles: NewsArticle[] = [
-          {
-            id: 'carbonpulse-1',
-            title: 'EU Carbon Market Weekly: EUA prices stable amid mixed signals',
-            description: 'EU carbon prices stayed in a narrow range this week as traders weighed bearish economic data against technical support.',
-            link: 'https://carbon-pulse.com/example-article-1',
-            pubDate: currentDate,
-            source_id: 'Carbon Pulse',
-            image_url: 'https://images.pexels.com/photos/2990650/pexels-photo-2990650.jpeg',
-            source: 'carbonpulse',
-            category: 'market analysis',
-            isNew: true
-          },
-          {
-            id: 'carbonpulse-2',
-            title: 'Voluntary carbon market faces scrutiny over quality standards',
-            description: 'The voluntary carbon market is seeing increased regulatory attention as concerns over credit quality and integrity continue to rise.',
-            link: 'https://carbon-pulse.com/example-article-2',
-            pubDate: new Date(Date.now() - 3600000 * 3).toISOString(),
-            source_id: 'Carbon Pulse',
-            image_url: 'https://images.pexels.com/photos/4218883/pexels-photo-4218883.jpeg',
-            source: 'carbonpulse',
-            category: 'regulation',
-            isNew: false
-          },
-          {
-            id: 'carbonpulse-3',
-            title: 'China ETS expands scope to include more industrial sectors',
-            description: "China's national emissions trading scheme will add new industrial sectors next year as part of efforts to reach carbon neutrality by 2060.",
-            link: 'https://carbon-pulse.com/example-article-3',
-            pubDate: new Date(Date.now() - 3600000 * 5).toISOString(),
-            source_id: 'Carbon Pulse',
-            image_url: 'https://images.pexels.com/photos/2965773/pexels-photo-2965773.jpeg',
-            source: 'carbonpulse',
-            category: 'policy',
-            isNew: false
-          }
-        ];
-
-        resolve({
-          status: 'success',
-          articles: mockArticles
-        });
-      }, 500);
-    });
-  } catch (error: any) {
-    console.error('Error fetching from Carbon Pulse:', error);
-    return {
-      status: 'error',
-      articles: [],
-      error: error.message || 'Failed to fetch news from Carbon Pulse'
-    };
-  }
-};
-
 const fetchAllNews = async (): Promise<NewsResponse> => {
   try {
-    const [newsdataResponse, gnewsResponse, carbonPulseResponse] = await Promise.allSettled([
+    const [newsdataResponse, gnewsResponse] = await Promise.all([
       fetchNewsDataArticles(),
-      fetchGNewsArticles(),
-      fetchCarbonPulseArticles()
+      fetchGNewsArticles()
     ]);
 
     const allArticles: NewsArticle[] = [];
     
-    if (newsdataResponse.status === 'fulfilled') {
-      allArticles.push(...newsdataResponse.value.articles);
+    if (newsdataResponse.status === 'success') {
+      allArticles.push(...newsdataResponse.articles);
     }
     
-    if (gnewsResponse.status === 'fulfilled') {
-      allArticles.push(...gnewsResponse.value.articles);
-    }
-    
-    if (carbonPulseResponse.status === 'fulfilled') {
-      allArticles.push(...carbonPulseResponse.value.articles);
+    if (gnewsResponse.status === 'success') {
+      allArticles.push(...gnewsResponse.articles);
     }
     
     allArticles.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
@@ -245,8 +178,6 @@ const NewsCard: React.FC<{ article: NewsArticle }> = ({ article }) => {
     switch (source) {
       case 'gnews':
         return <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />;
-      case 'carbonpulse':
-        return <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />;
       default:
         return <Newspaper className="h-5 w-5 text-blue-600 dark:text-blue-400" />;
     }
@@ -256,8 +187,6 @@ const NewsCard: React.FC<{ article: NewsArticle }> = ({ article }) => {
     switch (source) {
       case 'gnews':
         return 'bg-emerald-100 dark:bg-emerald-900/30';
-      case 'carbonpulse':
-        return 'bg-amber-100 dark:bg-amber-900/30';
       default:
         return 'bg-blue-100 dark:bg-blue-900/30';
     }
@@ -266,11 +195,10 @@ const NewsCard: React.FC<{ article: NewsArticle }> = ({ article }) => {
   const sourceColors = {
     newsdata: 'border-blue-200 hover:border-blue-300',
     gnews: 'border-emerald-200 hover:border-emerald-300',
-    carbonpulse: 'border-amber-200 hover:border-amber-300',
   };
 
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border-2 ${sourceColors[article.source]} transition-all duration-300 p-4 flex flex-col h-full hover:shadow-md opacity-0 animate-[fadeIn_0.5s_ease_forwards]`}>
+    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border-2 ${sourceColors[article.source]} transition-all duration-300 p-4 flex flex-col h-full hover:shadow-md`}>
       {article.image_url && (
         <div className="relative">
           <img
@@ -320,9 +248,6 @@ const NewsCard: React.FC<{ article: NewsArticle }> = ({ article }) => {
           {article.source === 'gnews' && (
             <span className="text-emerald-600 dark:text-emerald-400">{article.source_id}</span>
           )}
-          {article.source === 'carbonpulse' && (
-            <span className="text-amber-600 dark:text-amber-400">{article.source_id}</span>
-          )}
         </span>
         <a
           href={article.link}
@@ -361,8 +286,7 @@ const SourceFilter: React.FC<{
 }> = ({ selectedSources, onToggleSource }) => {
   const sources = [
     { id: 'newsdata', name: 'NewsData', icon: Newspaper, color: 'text-blue-600' },
-    { id: 'gnews', name: 'GNews', icon: TrendingUp, color: 'text-emerald-600' },
-    { id: 'carbonpulse', name: 'Carbon Pulse', icon: AlertCircle, color: 'text-amber-600' }
+    { id: 'gnews', name: 'GNews', icon: TrendingUp, color: 'text-emerald-600' }
   ];
 
   return (
@@ -401,7 +325,7 @@ const CarbonNews: React.FC = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [topics, setTopics] = useState<string[]>([]);
-  const [selectedSources, setSelectedSources] = useState<string[]>(['newsdata', 'gnews', 'carbonpulse']);
+  const [selectedSources, setSelectedSources] = useState<string[]>(['newsdata', 'gnews']);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   const fetchNews = useCallback(async (isRefreshing = false) => {
@@ -579,23 +503,11 @@ const CarbonNews: React.FC = () => {
         </div>
       )}
 
-      {filteredNews.length === 0 ? (
-        <div className="text-center py-12">
-          <Newspaper className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            No news articles found
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400 mt-2">
-            Try changing your filters or refreshing the page
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredNews.map((article) => (
-            <NewsCard key={article.id} article={article} />
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredNews.map((article) => (
+          <NewsCard key={article.id} article={article} />
+        ))}
+      </div>
     </div>
   );
 };

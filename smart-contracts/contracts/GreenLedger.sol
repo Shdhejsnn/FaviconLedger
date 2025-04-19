@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT 
 pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
@@ -80,8 +80,8 @@ contract GreenLedger is ERC721URIStorage, Ownable {
 
     // ✅ Sell credit back to owner and receive ETH
     function sellCredit(uint256 tokenId, uint256 salePrice) public {
-        require(ownerOf(tokenId) == msg.sender, "Not the owner");
-        require(address(this).balance >= salePrice, "Insufficient contract balance");
+        require(ownerOf(tokenId) == msg.sender, "You are not the owner of this token");
+        require(address(this).balance >= salePrice, "Contract doesn't have enough ETH to pay");
 
         _transfer(msg.sender, owner(), tokenId);
         payable(msg.sender).transfer(salePrice);

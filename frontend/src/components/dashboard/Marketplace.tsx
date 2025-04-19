@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'; 
 import axios from 'axios';
-import { ArrowUpDown, DollarSign, TrendingUp, Wallet, BarChart4, ExternalLink, Loader } from 'lucide-react';
+import { ArrowUpDown, TrendingUp, ExternalLink, Loader, BarChart4 } from 'lucide-react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import { useAuth } from '../../context/AuthContext';
 
-// Regions with base prices
 const REGIONS = [
   { name: "European Union", base: 66.85 },
   { name: "UK", base: 47.39 },
@@ -38,23 +37,23 @@ const Marketplace: React.FC = () => {
   const [mode, setMode] = useState<'buy' | 'sell'>('buy');
   const [prices, setPrices] = useState<PriceData[]>([]);
   const [region, setRegion] = useState(REGIONS[0].name);
+  const [sellRegion, setSellRegion] = useState(REGIONS[0].name);
   const [ethAmount, setEthAmount] = useState('');
   const [address, setAddress] = useState(wallet || '');
   const [privateKey, setPrivateKey] = useState('');
   const [tokenId, setTokenId] = useState('');
   const [estimatedCredits, setEstimatedCredits] = useState('0');
+  const [creditsToSell, setCreditsToSell] = useState('');
+  const [calculatedEthForSale, setCalculatedEthForSale] = useState('');
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [creditBalance, setCreditBalance] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingPrices, setLoadingPrices] = useState(true);
 
-  // Initialize address with wallet when component mounts
   useEffect(() => {
-    if (wallet) {
-      setAddress(wallet);
-    }
+    if (wallet) setAddress(wallet);
   }, [wallet]);
 
-  // Update prices with simulated market changes
   useEffect(() => {
     const updatePrices = () => {
       setLoadingPrices(true);
@@ -77,7 +76,6 @@ const Marketplace: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate estimated credits when inputs change
   useEffect(() => {
     const selected = prices.find((p) => p.name === region);
     if (selected && ethAmount && mode === 'buy') {
@@ -86,16 +84,25 @@ const Marketplace: React.FC = () => {
     }
   }, [region, ethAmount, prices, mode]);
 
-  // Handle buy transaction
+  useEffect(() => {
+    if (mode === 'sell' && creditsToSell && sellRegion && prices.length > 0) {
+      const regionData = prices.find(p => p.name === sellRegion);
+      if (regionData) {
+        const eth = (parseFloat(creditsToSell) * parseFloat(regionData.ethPerCredit)).toFixed(4);
+        setCalculatedEthForSale(eth);
+      }
+    }
+  }, [creditsToSell, sellRegion, prices, mode]);
+
   const handleBuy = async () => {
     if (!ethAmount || !address || !privateKey) {
       alert('Please fill in all fields');
       return;
     }
-    
+
     setLoading(true);
     const amount = parseFloat(estimatedCredits);
-    
+
     try {
       const res = await axios.post("http://localhost:5000/api/buy", {
         from: address,
@@ -117,8 +124,7 @@ const Marketplace: React.FC = () => {
         },
         ...prev,
       ]);
-      
-      // Reset form
+      setCreditBalance((prev) => prev + amount);
       setEthAmount('');
     } catch (err: any) {
       console.error(err);
@@ -128,39 +134,45 @@ const Marketplace: React.FC = () => {
     }
   };
 
-  // Handle sell transaction
   const handleSell = async () => {
-    if (!tokenId || !ethAmount || !address || !privateKey) {
+    if (!tokenId || !creditsToSell || !sellRegion || !address || !privateKey) {
       alert('Please fill in all fields');
       return;
     }
-    
+  
     setLoading(true);
-    
+  
     try {
       const res = await axios.post("http://localhost:5000/api/sell", {
         from: address,
         privateKey,
         tokenId,
-        salePriceInEth: ethAmount,
+        region: sellRegion,
+        credits: parseFloat(creditsToSell),
+        expectedEth: calculatedEthForSale,
       });
-
-      alert(`✅ Sale successful! TX: ${res.data.txHash}`);
+  
+      alert(`✅ Sale successful! TX: ${res.data.ledger.txHash}`);
+      
       setLedger((prev) => [
         {
           type: "SELL",
-          txHash: res.data.txHash || "N/A",
-          region: "N/A",
-          amount: `1 Token (#${tokenId})`,
-          ethAmount,
-          party: address,
+          txHash: res.data.ledger.txHash,
+          region: res.data.ledger.region,
+          amount: `${res.data.ledger.credits} (Token #${res.data.ledger.tokenId})`,
+          ethAmount: res.data.ledger.ethAmount,
+          party: res.data.ledger.seller,
         },
         ...prev,
       ]);
-      
+  
+      // ⬇️ Subtract sold credits from current credit balance
+      setCreditBalance((prev) => prev - parseFloat(res.data.ledger.credits));
+  
       // Reset form
       setTokenId('');
-      setEthAmount('');
+      setCreditsToSell('');
+      setCalculatedEthForSale('');
     } catch (err: any) {
       console.error(err);
       alert("❌ Sale failed: " + (err.response?.data?.error || 'Unknown error'));
@@ -168,274 +180,134 @@ const Marketplace: React.FC = () => {
       setLoading(false);
     }
   };
-
+  
   return (
     <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Carbon Credit Marketplace</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Buy and sell carbon credits with real-time pricing
-        </p>
-      </div>
-      
+      <h1 className="text-2xl font-bold mb-4">🌿 GreenLedger Marketplace</h1>
+
+      {/* 🪙 Credit Balance */}
+      <Card className="mb-6">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-semibold">🪙 Your Credit Balance</h3>
+          <p className="text-2xl font-bold text-emerald-600">{creditBalance} credits</p>
+        </div>
+      </Card>
+
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Price Table */}
+        {/* Prices */}
         <Card className="lg:col-span-2">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Live Carbon Credit Prices
-            </h3>
-            <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
-              <span className="animate-pulse mr-1 h-2 w-2 bg-emerald-500 rounded-full"></span>
-              Live updating
-            </div>
+            <h3 className="text-lg font-semibold">Live Carbon Credit Prices</h3>
+            <span className="text-xs text-gray-500">Auto-updating</span>
           </div>
-          
           {loadingPrices ? (
             <div className="h-64 flex items-center justify-center">
-              <Loader className="h-8 w-8 text-emerald-600 dark:text-emerald-500 animate-spin" />
+              <Loader className="animate-spin h-6 w-6" />
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-800">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Region
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Price (USD)
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      ETH/Credit
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      24h Change
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {prices.map((p, i) => (
-                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                        {p.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">
-                        ${p.price}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900 dark:text-white">
-                        {p.ethPerCredit} ETH
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                        <span className={`
-                          px-2 py-1 rounded-full text-xs
-                          ${parseFloat(p.change) >= 0
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                            : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'}
-                        `}>
-                          {parseFloat(p.change) > 0 ? '+' : ''}
-                          {p.change}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-        
-        {/* Buy/Sell Card */}
-        <Card>
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {mode === 'buy' ? 'Buy Carbon Credits' : 'Sell Carbon Credits'}
-            </h3>
-          </div>
-          
-          <div className="flex mb-4 bg-gray-100 dark:bg-gray-800 rounded-md p-1">
-            <button
-              onClick={() => setMode('buy')}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                mode === 'buy'
-                  ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              Buy
-            </button>
-            <button
-              onClick={() => setMode('sell')}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                mode === 'sell'
-                  ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              Sell
-            </button>
-          </div>
-          
-          <div className="space-y-4">
-            {mode === 'buy' && (
-              <Select
-                label="Region"
-                options={REGIONS.map(r => ({ value: r.name, label: r.name }))}
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                fullWidth
-              />
-            )}
-            
-            {mode === 'sell' && (
-              <Input
-                label="Token ID to Sell"
-                placeholder="Enter token ID"
-                value={tokenId}
-                onChange={(e) => setTokenId(e.target.value)}
-                fullWidth
-              />
-            )}
-            
-            <Input
-              label={mode === 'buy' ? 'ETH to Spend' : 'Expected ETH Price'}
-              placeholder="0.00"
-              type="number"
-              step="0.01"
-              value={ethAmount}
-              onChange={(e) => setEthAmount(e.target.value)}
-              fullWidth
-            />
-            
-            <Input
-              label="Wallet Address"
-              placeholder="0x..."
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              fullWidth
-            />
-            
-            <Input
-              label="Private Key"
-              placeholder="Enter your private key"
-              type="password"
-              value={privateKey}
-              onChange={(e) => setPrivateKey(e.target.value)}
-              fullWidth
-            />
-            
-            {mode === 'buy' && ethAmount && (
-              <div className="py-3 px-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-md">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-emerald-700 dark:text-emerald-300">Estimated Credits:</span>
-                  <span className="font-bold text-emerald-800 dark:text-emerald-200">{estimatedCredits}</span>
-                </div>
-              </div>
-            )}
-            
-            <Button
-              fullWidth
-              variant={mode === 'buy' ? 'primary' : 'secondary'}
-              onClick={mode === 'buy' ? handleBuy : handleSell}
-              disabled={loading}
-              className="mt-2"
-            >
-              {loading ? (
-                <span className="flex items-center">
-                  <Loader className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                  {mode === 'buy' ? 'Buying...' : 'Selling...'}
-                </span>
-              ) : (
-                <span className="flex items-center">
-                  {mode === 'buy' ? <ArrowUpDown className="mr-2 h-4 w-4" /> : <TrendingUp className="mr-2 h-4 w-4" />}
-                  {mode === 'buy' ? 'Buy Now' : 'Sell Now'}
-                </span>
-              )}
-            </Button>
-          </div>
-        </Card>
-      </div>
-      
-      {/* Transaction Ledger */}
-      <Card>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Blockchain Ledger</h3>
-        </div>
-        
-        {ledger.length === 0 ? (
-          <div className="py-12 text-center">
-            <BarChart4 className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">No transactions yet</p>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-              Your transaction history will appear here
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-800">
+            <table className="w-full text-sm">
+              <thead>
                 <tr>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    TX Hash
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Region
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Credits
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    ETH
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Wallet
-                  </th>
+                  <th className="text-left px-2 py-2">Region</th>
+                  <th className="text-right px-2 py-2">Price (USD)</th>
+                  <th className="text-right px-2 py-2">ETH/Credit</th>
+                  <th className="text-right px-2 py-2">24h</th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {ledger.map((tx, i) => (
-                  <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 dark:text-blue-400">
-                      <a 
-                        href={`https://sepolia.etherscan.io/tx/ ${tx.txHash || "#"}`}
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="flex items-center hover:underline"
-                      >
-                        {tx.txHash?.slice(0, 6) || "N/A"}...
-                        <ExternalLink className="ml-1 h-3 w-3" />
-                      </a>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">
-                      <span className={`
-                        px-2 py-1 rounded-full text-xs
-                        ${tx.type === 'BUY'
-                          ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300'
-                          : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'}
-                      `}>
-                        {tx.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {tx.region}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {tx.amount}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {tx.ethAmount} ETH
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {tx.party?.slice(0, 6) || "N/A"}...
+              <tbody>
+                {prices.map((p, i) => (
+                  <tr key={i} className="border-t">
+                    <td className="px-2 py-2">{p.name}</td>
+                    <td className="px-2 py-2 text-right">${p.price}</td>
+                    <td className="px-2 py-2 text-right">{p.ethPerCredit}</td>
+                    <td className={`px-2 py-2 text-right ${parseFloat(p.change) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {p.change}%
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          )}
+        </Card>
+
+        {/* Buy/Sell Form */}
+        <Card>
+          <div className="flex justify-between mb-4">
+            <h3 className="text-lg font-semibold">{mode === 'buy' ? "Buy Credits" : "Sell Credits"}</h3>
           </div>
+
+          <div className="flex space-x-2 mb-4">
+            <Button onClick={() => setMode('buy')} variant={mode === 'buy' ? 'primary' : 'outline'} fullWidth>Buy</Button>
+            <Button onClick={() => setMode('sell')} variant={mode === 'sell' ? 'primary' : 'outline'} fullWidth>Sell</Button>
+          </div>
+
+          <div className="space-y-4">
+            {mode === 'buy' && (
+              <Select label="Region" options={REGIONS.map(r => ({ label: r.name, value: r.name }))} value={region} onChange={(e) => setRegion(e.target.value)} fullWidth />
+            )}
+
+            {mode === 'sell' && (
+              <>
+                <Input label="Token ID" value={tokenId} onChange={(e) => setTokenId(e.target.value)} fullWidth />
+                <Input label="Credits to Sell" value={creditsToSell} onChange={(e) => setCreditsToSell(e.target.value)} fullWidth />
+                <Select label="Region" options={REGIONS.map(r => ({ label: r.name, value: r.name }))} value={sellRegion} onChange={(e) => setSellRegion(e.target.value)} fullWidth />
+                <Input label="Calculated ETH" value={calculatedEthForSale} disabled fullWidth />
+              </>
+            )}
+
+            {mode === 'buy' && (
+              <Input label="ETH to Spend" value={ethAmount} onChange={(e) => setEthAmount(e.target.value)} fullWidth />
+            )}
+
+            <Input label="Wallet Address" value={address} onChange={(e) => setAddress(e.target.value)} fullWidth />
+            <Input label="Private Key" type="password" value={privateKey} onChange={(e) => setPrivateKey(e.target.value)} fullWidth />
+
+            {mode === 'buy' && ethAmount && (
+              <div className="text-sm text-emerald-700">Estimated Credits: <strong>{estimatedCredits}</strong></div>
+            )}
+
+            <Button fullWidth onClick={mode === 'buy' ? handleBuy : handleSell} disabled={loading}>
+              {loading ? (mode === 'buy' ? 'Buying...' : 'Selling...') : (mode === 'buy' ? 'Buy Now' : 'Sell Now')}
+            </Button>
+          </div>
+        </Card>
+      </div>
+
+      {/* Ledger */}
+      <Card>
+        <h3 className="text-lg font-semibold mb-4">📜 Transaction Ledger</h3>
+        {ledger.length === 0 ? (
+          <div className="text-gray-500">No transactions yet.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr>
+                <th className="text-left px-2 py-2">TX</th>
+                <th>Type</th>
+                <th>Region</th>
+                <th>Credits</th>
+                <th>ETH</th>
+                <th>Wallet</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledger.map((tx, i) => (
+                <tr key={i} className="border-t">
+                  <td className="px-2 py-2">
+                    <a href={`https://sepolia.etherscan.io/tx/${tx.txHash}`} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">
+                      {tx.txHash.slice(0, 10)}...
+                    </a>
+                  </td>
+                  <td>{tx.type}</td>
+                  <td>{tx.region}</td>
+                  <td>{tx.amount}</td>
+                  <td>{tx.ethAmount}</td>
+                  <td>{tx.party.slice(0, 8)}...</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </Card>
     </div>

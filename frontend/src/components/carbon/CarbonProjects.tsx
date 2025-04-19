@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React from 'react';
 import { Loader, TreePine, Globe, ArrowUpRight, AlertTriangle } from 'lucide-react';
 import Card from '../ui/Card';
 
@@ -14,80 +13,60 @@ interface CarbonProject {
   verification_standard: string;
   project_url?: string;
   image_url?: string;
+  coordinates: [number, number]; // Coordinates for the map
 }
 
 const CarbonProjects: React.FC = () => {
-  const [projects, setProjects] = useState<CarbonProject[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = React.useState<boolean>(true);
+  const [error, setError] = React.useState<string>('');
+  const [selectedCountry, setSelectedCountry] = React.useState<string>('');
+  const [countries, setCountries] = React.useState<{ id: string }[]>([]);
 
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        setLoading(true);
-        setError('');
+  const projects: CarbonProject[] = [
+    {
+      id: '1',
+      name: 'Amazon Rainforest Conservation',
+      location: 'Brazil',
+      type: 'Reforestation',
+      description: 'This is a description for Project A',
+      credits_available: 1000,
+      price_per_credit: 10.50,
+      verification_standard: 'Verified Carbon Standard (VCS)',
+      project_url: 'https://example.com/projectA',
+      image_url: 'https://example.com/imageA.jpg',
+      coordinates: [-60, -5], // Example coordinates
+    },
+    {
+      id: '2',
+      name: 'Sahara Solar Farm',
+      location: 'Morocco',
+      type: 'Solar Energy',
+      description: 'This is a description for Project B',
+      credits_available: 1500,
+      price_per_credit: 12.75,
+      verification_standard: 'Gold Standard',
+      project_url: 'https://example.com/projectB',
+      image_url: 'https://example.com/imageB.jpg',
+      coordinates: [-5, 31], // Example coordinates
+    },
+    {
+      id: '3',
+      name: 'Baltic Wind Farm',
+      location: 'Denmark',
+      type: 'Wind Energy',
+      description: 'This is a description for Project C',
+      credits_available: 500,
+      price_per_credit: 15.00,
+      verification_standard: 'Verified Carbon Standard (VCS)',
+      project_url: 'https://example.com/projectC',
+      image_url: 'https://example.com/imageC.jpg',
+      coordinates: [10, 56], // Example coordinates
+    },
+    // Add more projects as needed
+  ];
 
-        // Fetch real projects from Verra Registry API
-        const response = await axios.get('https://registry.verra.org/api/projects', {
-          params: {
-            $limit: 9,
-            $sort: {
-              createdAt: -1
-            },
-            status: 'registered',
-            type: 'VCS'
-          }
-        });
-
-        // Transform Verra data to our format
-        const transformedProjects = response.data.data.map((project: any) => ({
-          id: project.id,
-          name: project.name,
-          location: project.country,
-          type: project.projectType,
-          description: project.description || 'No description available',
-          credits_available: project.estimatedAnnualEmissionReductions || 0,
-          price_per_credit: (Math.random() * (25 - 10) + 10).toFixed(2), // Simulated price
-          verification_standard: 'Verified Carbon Standard (VCS)',
-          project_url: `https://registry.verra.org/app/projectDetail/VCS/${project.id}`,
-          image_url: project.proponentLogo || null
-        }));
-
-        setProjects(transformedProjects);
-      } catch (error) {
-        console.error('Error fetching projects:', error);
-        
-        // Fallback to backup API if Verra fails
-        try {
-          const backupResponse = await axios.get('https://api.goldstandard.org/projects', {
-            params: {
-              limit: 9,
-              status: 'active'
-            }
-          });
-
-          const transformedBackupProjects = backupResponse.data.data.map((project: any) => ({
-            id: project.id,
-            name: project.title,
-            location: project.country,
-            type: project.projectType,
-            description: project.description,
-            credits_available: project.availableCredits,
-            price_per_credit: project.creditPrice || 15.00,
-            verification_standard: 'Gold Standard',
-            project_url: project.projectUrl
-          }));
-
-          setProjects(transformedBackupProjects);
-        } catch (backupError) {
-          setError('Failed to load carbon projects. Please try again later.');
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProjects();
+  React.useEffect(() => {
+    setLoading(false);
   }, []);
 
   if (loading) {
@@ -187,6 +166,7 @@ const CarbonProjects: React.FC = () => {
             </a>
           </Card>
         ))}
+
       </div>
     </div>
   );

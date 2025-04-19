@@ -1,9 +1,12 @@
+// Dashboard.tsx
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Wallet, Building, PieChart, ArrowUpRight, Loader, Newspaper } from 'lucide-react';
 import Card from '../ui/Card';
 import { useAuth } from '../../context/AuthContext';
 import { CarbonPriceWidget } from './CarbonPriceWidget';
+import { useCarbonPrice } from '../../context/CarbonPriceContext';
+import { CarbonPriceData } from '../../context/CarbonPriceContext';
 
 interface CompanyData {
   name: string;
@@ -30,13 +33,14 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [loadingNews, setLoadingNews] = useState<boolean>(true);
+  const { carbonPrices } = useCarbonPrice();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         // Fetch company data
-        const res = await axios.get(`http://localhost:5000/api/company/${wallet}`);
+        const res = await axios.get<CompanyData>(`http://localhost:5000/api/company/${wallet}`);
         setCompany(res.data);
 
         // Fetch ETH balance
@@ -50,9 +54,12 @@ const Dashboard: React.FC = () => {
         const balanceInWei = parseInt(web3Res.data.result, 16);
         const balanceInEth = balanceInWei / 1e18;
         setEthBalance(balanceInEth.toFixed(4));
-        
-        // Mock carbon credits data
-        setCarbonCredits(Math.floor(Math.random() * 100) + 10);
+
+        // Fetch carbon credits from the marketplace
+        if (carbonPrices.length > 0) {
+          const price = carbonPrices.find((p: CarbonPriceData) => p.region === 'European Union');
+          setCarbonCredits(price ? parseFloat(price.price.toFixed(2)) : 0);
+        }
       } catch (err) {
         console.error("Dashboard Error:", err);
       } finally {
@@ -61,13 +68,13 @@ const Dashboard: React.FC = () => {
     };
 
     if (wallet) fetchData();
-  }, [wallet]);
+  }, [wallet, carbonPrices]);
 
   useEffect(() => {
     const fetchNews = async () => {
       try {
         setLoadingNews(true);
-        const response = await axios.get(
+        const response = await axios.get<{ results: NewsArticle[] }>(
           'https://newsdata.io/api/1/news',
           {
             params: {
