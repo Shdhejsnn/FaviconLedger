@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { contract, web3 } = require("../contract");
 
-const ownerAddress = "0x4d55a3a99c9E2c2D5f3a6a04D51F671Ef1fEd0bC"; // 💡 Ganache deployer
+const ownerAddress = "0x9A770E0F8b03b47ef15Fc8e279aB717b58A6dB92"; // 💡 Ganache deployer
 
 // ✅ Register company
 router.post("/register", async (req, res) => {

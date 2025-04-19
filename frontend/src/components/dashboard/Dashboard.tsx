@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Wallet, Building, PieChart, ArrowUpRight, BarChart3, Loader, Leaf } from 'lucide-react';
+import { Wallet, Building, PieChart, ArrowUpRight, Loader, Newspaper } from 'lucide-react';
 import Card from '../ui/Card';
 import { useAuth } from '../../context/AuthContext';
 import { CarbonPriceWidget } from './CarbonPriceWidget';
@@ -12,6 +12,14 @@ interface CompanyData {
   threshold: number;
 }
 
+interface NewsArticle {
+  title: string;
+  description: string;
+  link: string;
+  pubDate: string;
+  source_id: string;
+}
+
 const companyTypes = ["Agriculture", "Manufacturing", "Technology", "Energy"];
 
 const Dashboard: React.FC = () => {
@@ -20,7 +28,8 @@ const Dashboard: React.FC = () => {
   const [ethBalance, setEthBalance] = useState<string>('');
   const [carbonCredits, setCarbonCredits] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [news, setNews] = useState<NewsArticle[]>([]);
+  const [loadingNews, setLoadingNews] = useState<boolean>(true);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,31 +53,6 @@ const Dashboard: React.FC = () => {
         
         // Mock carbon credits data
         setCarbonCredits(Math.floor(Math.random() * 100) + 10);
-        
-        // Mock transaction data
-        setTransactions([
-          {
-            id: 'tx1',
-            type: 'Purchase',
-            amount: '5.2',
-            date: '2025-04-15',
-            status: 'Completed',
-          },
-          {
-            id: 'tx2',
-            type: 'Sale',
-            amount: '2.0',
-            date: '2025-04-10',
-            status: 'Completed',
-          },
-          {
-            id: 'tx3',
-            type: 'Purchase',
-            amount: '3.5',
-            date: '2025-04-05',
-            status: 'Completed',
-          }
-        ]);
       } catch (err) {
         console.error("Dashboard Error:", err);
       } finally {
@@ -78,6 +62,33 @@ const Dashboard: React.FC = () => {
 
     if (wallet) fetchData();
   }, [wallet]);
+
+  useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        setLoadingNews(true);
+        const response = await axios.get(
+          'https://newsdata.io/api/1/news',
+          {
+            params: {
+              apikey: 'pub_8156513aabd8c7e895e4b7736871655fb118d',
+              q: 'carbon market OR carbon credits OR emissions trading',
+              language: 'en',
+              category: 'business,environment'
+            }
+          }
+        );
+        
+        setNews(response.data.results.slice(0, 5));
+      } catch (error) {
+        console.error('Error fetching news:', error);
+      } finally {
+        setLoadingNews(false);
+      }
+    };
+
+    fetchNews();
+  }, []);
 
   if (loading) {
     return (
@@ -121,7 +132,7 @@ const Dashboard: React.FC = () => {
               <h3 className="text-2xl font-bold text-emerald-900 dark:text-emerald-100 mt-1">{carbonCredits} credits</h3>
             </div>
             <div className="bg-emerald-200 dark:bg-emerald-800 p-2 rounded-lg">
-              <Leaf className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+              <PieChart className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
             </div>
           </div>
         </Card>
@@ -168,48 +179,46 @@ const Dashboard: React.FC = () => {
           </div>
         </Card>
         
-        {/* Recent Transactions */}
+        {/* Carbon Market News */}
         <Card>
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Transactions</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Carbon Market News</h3>
             <a href="#" className="text-sm text-emerald-600 dark:text-emerald-500 flex items-center hover:underline">
               View All
               <ArrowUpRight className="ml-1 h-4 w-4" />
             </a>
           </div>
-          {transactions.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400 text-center py-4">No transactions yet</p>
+          
+          {loadingNews ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader className="h-8 w-8 text-emerald-600 dark:text-emerald-500 animate-spin" />
+            </div>
+          ) : news.length === 0 ? (
+            <div className="text-center py-8">
+              <Newspaper className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
+              <p className="text-gray-500 dark:text-gray-400">No news available</p>
+            </div>
           ) : (
-            <div className="space-y-3">
-              {transactions.map((tx) => (
-                <div 
-                  key={tx.id} 
-                  className="flex items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+            <div className="space-y-4">
+              {news.map((article, index) => (
+                <a
+                  key={index}
+                  href={article.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 >
-                  <div className={`p-2 rounded 
-                    ${tx.type === 'Purchase' 
-                      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' 
-                      : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'}
-                  `}>
-                    {tx.type === 'Purchase' ? (
-                      <BarChart3 className="h-5 w-5" />
-                    ) : (
-                      <ArrowUpRight className="h-5 w-5" />
-                    )}
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1 line-clamp-2">
+                    {article.title}
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-2">
+                    {article.description}
+                  </p>
+                  <div className="flex justify-between items-center text-xs text-gray-400 dark:text-gray-500">
+                    <span>{article.source_id}</span>
+                    <span>{new Date(article.pubDate).toLocaleDateString()}</span>
                   </div>
-                  <div className="ml-3 flex-1">
-                    <div className="flex justify-between">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{tx.type}</p>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{tx.amount} credits</p>
-                    </div>
-                    <div className="flex justify-between mt-0.5">
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{tx.date}</p>
-                      <span className="text-xs px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded">
-                        {tx.status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                </a>
               ))}
             </div>
           )}

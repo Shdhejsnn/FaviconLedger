@@ -6,13 +6,17 @@ import Footer from './components/layout/Footer';
 import LandingPage from './components/landing/LandingPage';
 import Dashboard from './components/dashboard/Dashboard';
 import Marketplace from './components/dashboard/Marketplace';
+import CarbonProjects from './components/carbon/CarbonProjects';
+import CarbonNews from './components/carbon/CarbonNews';
 import Modal from './components/ui/Modal';
 import RegisterLogin from './components/auth/RegisterLogin';
+
+type Page = 'dashboard' | 'marketplace' | 'projects' | 'news';
 
 const AppContent: React.FC = () => {
   const { isLoggedIn } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [activePage, setActivePage] = useState<'dashboard' | 'marketplace'>('dashboard');
+  const [activePage, setActivePage] = useState<Page>('dashboard');
 
   const handleAuthSuccess = () => {
     setShowAuthModal(false);
@@ -28,7 +32,12 @@ const AppContent: React.FC = () => {
       
       <main className="flex-grow">
         {isLoggedIn ? (
-          activePage === 'dashboard' ? <Dashboard /> : <Marketplace />
+          {
+            'dashboard': <Dashboard />,
+            'marketplace': <Marketplace />,
+            'projects': <CarbonProjects />,
+            'news': <CarbonNews />
+          }[activePage]
         ) : (
           <LandingPage onOpenAuthModal={() => setShowAuthModal(true)} />
         )}

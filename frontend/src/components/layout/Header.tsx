@@ -6,8 +6,8 @@ import { useAuth } from '../../context/AuthContext';
 
 interface HeaderProps {
   onOpenAuthModal?: () => void;
-  activePage: 'dashboard' | 'marketplace';
-  onPageChange: (page: 'dashboard' | 'marketplace') => void;
+  activePage: 'dashboard' | 'marketplace' | 'projects' | 'news';
+  onPageChange: (page: 'dashboard' | 'marketplace' | 'projects' | 'news') => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -48,6 +48,26 @@ const Header: React.FC<HeaderProps> = ({
               onClick={() => onPageChange('marketplace')}
             >
               Marketplace
+            </button>
+            <button 
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                activePage === 'projects' 
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' 
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+              onClick={() => onPageChange('projects')}
+            >
+              Carbon Projects
+            </button>
+            <button 
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                activePage === 'news' 
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' 
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+              onClick={() => onPageChange('news')}
+            >
+              Market News
             </button>
           </nav>
         )}
